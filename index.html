@@ -18,17 +18,67 @@ function log(str) {
   window.scrollTo(0,document.body.scrollHeight);
 }
 
-async function initBt() {
+// This function keeps calling "toTry" until promise resolves or has
+// retried "max" number of times. First retry has a delay of "delay" seconds.
+// "success" is called upon success.
+//
+// From: https://googlechrome.github.io/samples/web-bluetooth/automatic-reconnect-async-await.html
+async function exponentialBackoff(max, delay, toTry, success, fail) {
+  try {
+    const result = await toTry();
+    return success(result);
+  } catch(error) {
+    if (max === 0) {
+      return fail();
+    }
+    log('Retrying in ' + delay + 's... (' + max + ' tries left)');
+    setTimeout(function() {
+      exponentialBackoff(--max, delay * 2, toTry, success, fail);
+    }, delay * 1000);
+  }
+}
+
+async function connect(device) {
+  return exponentialBackoff(30 /* max retries */, 2 /* seconds delay */,
+    async function toTry() {
+      log('Connecting to Bluetooth Device... ');
+      return await device.gatt.connect();
+    },
+    function success(value) {
+      log('> Bluetooth Device connected. Try disconnect it now.');
+      return value;
+    },
+    function fail() {
+      log('Failed to reconnect.');
+    });
+}
+
+function onDisconnected() {
+  log('> Bluetooth Device disconnected');
+  initBt(this);
+}
+
+async function initBt(existingDevice) {
   const serviceUuid = "cycling_power";
   const characteristicUuid = "cycling_power_measurement";
 
   try {
-    log('Requesting Bluetooth Device...');
-    const device = await navigator.bluetooth.requestDevice({
+    let device = null;
+
+    if (existingDevice) {
+      log('Using existing bluetooth device...');
+      device = existingDevice;
+    }
+    else {
+      log('Requesting Bluetooth Device...');
+      device = await navigator.bluetooth.requestDevice({
         filters: [{services: [serviceUuid]}]});
+    }
+
+    device.addEventListener('gattserverdisconnected', onDisconnected);
 
     log('Connecting to GATT Server...');
-    const server = await device.gatt.connect();
+    const server = await connect(device);
 
     log('Getting Service...');
     const service = await server.getPrimaryService(serviceUuid);
@@ -39,8 +89,8 @@ async function initBt() {
     await powerMeasurement.startNotifications();
 
     log('> Notifications started');
-    powerMeasurement.addEventListener('characteristicvaluechanged',
-        handleNotifications);
+    powerMeasurement.addEventListener('characteristicvaluechanged', handleNotifications);
+
   } catch(error) {
     log('Argh! ' + error);
   }
@@ -165,8 +215,8 @@ log("Page initialized");
 
 TODO:
  add to local storage
- handle reconnect? see https://googlechrome.github.io/samples/web-bluetooth/automatic-reconnect.html
  generate tcx or gpx (see strava docs)
+ vibrate on disconnect?
 
  */
 </script>
