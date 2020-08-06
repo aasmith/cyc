@@ -1,0 +1,122 @@
+<style>
+pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
+</style>
+<h1>Hello</h1>
+
+<button id="go">Activate logging</button>
+
+<pre id="log"></pre>
+
+<script>
+
+//// bluetooth
+
+var powerMeasurement;
+
+function log(str) {
+  document.getElementById("log").innerText += new Date().toLocaleString() + " > " + str + "\n";
+  window.scrollTo(0,document.body.scrollHeight);
+}
+
+async function initBt() {
+  const serviceUuid = "cycling_power";
+  const characteristicUuid = "cycling_power_measurement";
+
+  try {
+    log('Requesting Bluetooth Device...');
+    const device = await navigator.bluetooth.requestDevice({
+        filters: [{services: [serviceUuid]}]});
+
+    log('Connecting to GATT Server...');
+    const server = await device.gatt.connect();
+
+    log('Getting Service...');
+    const service = await server.getPrimaryService(serviceUuid);
+
+    log('Getting Characteristic...');
+    powerMeasurement = await service.getCharacteristic(characteristicUuid);
+
+    await powerMeasurement.startNotifications();
+
+    log('> Notifications started');
+    powerMeasurement.addEventListener('characteristicvaluechanged',
+        handleNotifications);
+  } catch(error) {
+    log('Argh! ' + error);
+  }
+}
+
+async function onStopButtonClick() {
+  if (powerMeasurement) {
+    try {
+      await powerMeasurement.stopNotifications();
+      log('> Notifications stopped');
+      powerMeasurement.removeEventListener('characteristicvaluechanged',
+          handleNotifications);
+    } catch(error) {
+      log('Argh! ' + error);
+    }
+  }
+}
+
+function handleNotifications(event) {
+  let value = event.target.value;
+  let a = [];
+  // Convert raw data bytes to hex values just for the sake of showing something.
+  // In the "real" world, you'd use data.getUint8, data.getUint16 or even
+  // TextDecoder to process raw data bytes.
+  for (let i = 0; i < value.byteLength; i++) {
+    a.push('0x' + ('00' + value.getUint8(i).toString(16)).slice(-2));
+  }
+  log('> ' + a.join(' '));
+}
+
+//// gps
+
+function handlePosition(pos) {
+  console.log(pos);
+
+  lastPos = pos;
+
+  showLatest();
+}
+
+function initGps() {
+  navigator.geolocation.watchPosition(handlePosition, function(e) { log("GPS Error: " + e) }, {
+    enableHighAccuracy: true,
+    maximumAge: 30 * 1000
+  })
+}
+
+//// global data
+
+let lastPos = null;
+let lastBt = null;
+
+function showLatest() {
+  pos = lastPos;
+
+  log(pos.coords.latitude + "," + pos.coords.longitude + " to " + pos.coords.accuracy + " meters");
+  log("bt readout TODO");
+}
+
+//// wiring
+
+document.getElementById("go").addEventListener('click', function(){
+  log("Starting up by request!");
+  initBt();
+  initGps();
+  log("Systems initialized");
+});
+
+log("Page initialized");
+
+/*
+
+TODO:
+ read bt data
+ add to local storage
+ handle reconnect? see https://googlechrome.github.io/samples/web-bluetooth/automatic-reconnect.html
+
+ */
+</script>
