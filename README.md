@@ -1,5 +1,5 @@
 cyc
----
+===
 
 Reads bicycle data using Bluetooth.
 
@@ -9,7 +9,15 @@ bike computer. Logs instantaneous power, wheel & crank revs, plus joules.
 Currently a work in progress that will only work with devices that
 return exactly the above fields.
 
-Supported devices:
+Supported devices
+-----------------
 
 Yamaha e-bikes maybe?
+
+Running locally
+---------------
+
+```
+ruby -run -ehttpd . -p8000
+```
 
