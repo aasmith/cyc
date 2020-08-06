@@ -59,17 +59,65 @@ async function onStopButtonClick() {
   }
 }
 
+const flags = [
+  "Pedal Power Balance Present",
+  "Pedal Power Balance Reference",
+  "Accumulated Torque Present",
+  "Accumulated Torque Source",
+  "Wheel Revolution Data Present",
+  "Crank Revolution Data Present",
+  "Extreme Force Magnitudes Present",
+  "Extreme Torque Magnitudes Present",
+  "Extreme Angles Present",
+  "Top Dead Spot Angle Present",
+  "Bottom Dead Spot Angle Present",
+  "Accumulated Energy Present",
+  "Offset Compensation Indicator"
+]
+
 function handleNotifications(event) {
-  let value = event.target.value;
-  let a = [];
-  // Convert raw data bytes to hex values just for the sake of showing something.
-  // In the "real" world, you'd use data.getUint8, data.getUint16 or even
-  // TextDecoder to process raw data bytes.
-  for (let i = 0; i < value.byteLength; i++) {
-    a.push('0x' + ('00' + value.getUint8(i).toString(16)).slice(-2));
+  let data = event.target.value; // dataview of buffer.
+
+  var features = data.getUint8(0) + (data.getUint8(1) << 8);
+
+  flags.forEach(function(feature, offset) {
+    if ((features >> offset) & 1 == 1) {
+      console.log(feature)
+    }
+  })
+
+  if (features != (16 | 32 | 2048)) {
+    console.error("Exact flags are not set, this will not work.");
   }
-  log('> ' + a.join(' '));
+
+  var values = {
+    "ipower" : littleEndianInt(data,  2, 2, true),
+    "wrev"   : littleEndianInt(data,  4, 4, false),
+    "wtime"  : littleEndianInt(data,  8, 2, false) * (2**-11),
+    "crev"   : littleEndianInt(data, 10, 2, false),
+    "ctime"  : littleEndianInt(data, 12, 2, false) * (2**-10),
+    "joules" : littleEndianInt(data, 14, 2, false) * (10**3)
+  }
+
+
+  console.table(values);
+  log(values);
 }
+
+// extracts data with the correct endianness for bluetooth.
+// little endian intN, where N is number of bytes (length).
+function littleEndianInt(data, offset, length, signed) {
+  var val = 0;
+
+  for (var i = 0; i < length; i++) {
+    val += signed ? data.getInt8(offset + i) : data.getUint8(offset + i) << (i * 8);
+  }
+
+  return val;
+}
+
+
+
 
 //// gps
 
