@@ -3,7 +3,7 @@ pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
 </style>
 <h1>Hello</h1>
 
-<button id="go">Activate logging</button>
+<button id="go">Activate!</button>
 
 <pre id="log"></pre>
 
@@ -16,41 +16,6 @@ var powerMeasurement;
 function log(str) {
   document.getElementById("log").innerText += new Date().toLocaleString() + " > " + str + "\n";
   window.scrollTo(0,document.body.scrollHeight);
-}
-
-// This function keeps calling "toTry" until promise resolves or has
-// retried "max" number of times. First retry has a delay of "delay" seconds.
-// "success" is called upon success.
-//
-// From: https://googlechrome.github.io/samples/web-bluetooth/automatic-reconnect-async-await.html
-async function exponentialBackoff(max, delay, toTry, success, fail) {
-  try {
-    const result = await toTry();
-    return success(result);
-  } catch(error) {
-    if (max === 0) {
-      return fail();
-    }
-    log('Retrying in ' + delay + 's... (' + max + ' tries left)');
-    setTimeout(function() {
-      exponentialBackoff(--max, delay * 2, toTry, success, fail);
-    }, delay * 1000);
-  }
-}
-
-async function connect(device) {
-  return exponentialBackoff(30 /* max retries */, 2 /* seconds delay */,
-    async function toTry() {
-      log('Connecting to Bluetooth Device... ');
-      return await device.gatt.connect();
-    },
-    function success(value) {
-      log('> Bluetooth Device connected. Try disconnect it now.');
-      return value;
-    },
-    function fail() {
-      log('Failed to reconnect.');
-    });
 }
 
 function onDisconnected() {
@@ -70,15 +35,26 @@ async function initBt(existingDevice) {
       device = existingDevice;
     }
     else {
-      log('Requesting Bluetooth Device...');
+      log('Requesting new Bluetooth Device...');
       device = await navigator.bluetooth.requestDevice({
         filters: [{services: [serviceUuid]}]});
+
+      device.addEventListener('gattserverdisconnected', onDisconnected);
     }
 
-    device.addEventListener('gattserverdisconnected', onDisconnected);
+    var server;
 
-    log('Connecting to GATT Server...');
-    const server = await connect(device);
+    while (!server) {
+      log('Connecting to GATT Server...');
+
+      try {
+        server = await device.gatt.connect();
+      }
+      catch (e) {
+        log("err while connecting, will sleep " + e);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
 
     log('Getting Service...');
     const service = await server.getPrimaryService(serviceUuid);
@@ -152,6 +128,7 @@ function handleNotifications(event) {
   // console.table(values);
 
   lastBt = values;
+  lastBtTime = new Date();
   showLatest();
 }
 
@@ -176,6 +153,7 @@ function handlePosition(pos) {
   console.log(pos);
 
   lastPos = pos;
+  lastPosTime = new Date();
 
   showLatest();
 }
@@ -192,12 +170,16 @@ function initGps() {
 let lastPos = null;
 let lastBt = null;
 
-function showLatest() {
-  pos = lastPos;
-  read = lastBt;
+let lastPosTime = new Date(0);
+let lastBtTime = new Date(0);
 
-  log(pos.coords.latitude + "," + pos.coords.longitude + " to " + pos.coords.accuracy + " meters");
-  log(JSON.stringify(read));
+function showLatest() {
+  const pos = lastPos;
+  const read = lastBt;
+  const now = new Date();
+
+  log((now - lastPosTime) / 1000 + "s ago " + pos.coords.latitude + "," + pos.coords.longitude + " to " + pos.coords.accuracy + " meters");
+  log((now - lastBtTime) / 1000 + "s ago " + JSON.stringify(read));
 }
 
 //// wiring
