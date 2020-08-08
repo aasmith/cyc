@@ -4,6 +4,7 @@ pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
 <h1>Hello</h1>
 
 <button id="go">Activate!</button>
+<button id="doc">Show data</button>
 
 <pre id="log"></pre>
 
@@ -152,6 +153,7 @@ function littleEndianInt(data, offset, length, signed) {
 function handlePosition(pos) {
   console.log(pos);
 
+  // TODO: don't update pos if accuracy worse than 500m
   lastPos = pos;
   lastPosTime = new Date();
 
@@ -161,7 +163,7 @@ function handlePosition(pos) {
 function initGps() {
   navigator.geolocation.watchPosition(handlePosition, function(e) { log("GPS Error: " + e) }, {
     enableHighAccuracy: true,
-    maximumAge: 30 * 1000
+    maximumAge: 3 * 1000
   })
 }
 
@@ -178,9 +180,137 @@ function showLatest() {
   const read = lastBt;
   const now = new Date();
 
+  if (lastPos)
   log((now - lastPosTime) / 1000 + "s ago " + pos.coords.latitude + "," + pos.coords.longitude + " to " + pos.coords.accuracy + " meters");
+
+  if (lastBt)
   log((now - lastBtTime) / 1000 + "s ago " + JSON.stringify(read));
 }
+
+
+//// output
+
+var points = [];
+
+function popData() {
+  if (lastPos && lastBt) {
+    points.push({pos: lastPos, bike: lastBt, time: new Date()});
+  }
+}
+
+function initOutput() {
+  setInterval(popData ,5000);
+}
+
+function showDoc() {
+  log(new XMLSerializer().serializeToString(buildDoc(compileData(points))));
+}
+
+// compile the raw readout data into a structure that contains
+// derived values, such as distance (i.e. using wrevs + wheel diameter)
+function compileData(points) {
+  var data = [];
+
+  if (points.length < 1) { return data; }
+
+  // start one element into the list as we get pairs
+  for (var i = 1; i < points.length; i++) {
+
+    var prev = points[i - 1];
+    var curr = points[i];
+
+    var distance = (curr.bike.wrev - prev.bike.wrev) * 2.2;
+    var speed = distance / (curr.bike.wtime - prev.bike.wtime);
+    var cadence = (curr.bike.crev - prev.bike.crev) / (curr.bike.ctime - prev.bike.ctime) * 60;
+    var power = curr.bike.ipower;
+
+    data.push({
+      // bike data
+      distance: distance,
+      cadence: isNaN(cadence) ? 0 : cadence,
+      speed: isNaN(speed) ? 0 : speed,
+      power: power,
+
+      // position
+      lat: curr.pos.coords.latitude,
+      lon: curr.pos.coords.longitude,
+      ele: curr.pos.coords.altitude,
+
+      time: curr.time
+    });
+  }
+
+  return data;
+}
+
+function buildDoc(points) {
+  var doc = document.implementation.createDocument("", "", null);
+  var gpx = doc.createElement("gpx");
+  gpx.setAttribute("creator", "cyc");
+  gpx.setAttribute("xmlns", "http://www.topografix.com/GPX/1/1");
+  gpx.setAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
+  gpx.setAttribute("xsi:schemaLocation",
+    "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd");
+  gpx.setAttribute("version", "1.1");
+
+  var trk = doc.createElement("trk");
+
+  var name = doc.createElement("name");
+  name.textContent = "ride";
+
+  var type = doc.createElement("type");
+  type.textContent = "1";
+
+  trk.appendChild(name);
+  trk.appendChild(type);
+
+  var trkseg = doc.createElement("trkseg");
+
+  points.forEach(function(point){
+    var trkpt = doc.createElement("trkpt");
+    trkpt.setAttribute("lat", point.lat);
+    trkpt.setAttribute("lon", point.lon);
+
+    var ele = doc.createElement("ele");
+    ele.textContent = point.ele;
+
+    var speed = doc.createElement("speed");
+    speed.textContent = point.speed;
+
+    var time = doc.createElement("time");
+    time.textContent = point.time.toISOString();
+
+    trkpt.appendChild(ele);
+    trkpt.appendChild(time);
+
+    var extensions = doc.createElement("extensions");
+
+    var cadence = doc.createElement("cadence");
+    cadence.textContent = point.cadence;
+
+    var distance = doc.createElement("distance");
+    distance.textContent = point.distance;
+
+    var power = doc.createElement("power");
+    power.textContent = point.power;
+
+    extensions.appendChild(cadence);
+    extensions.appendChild(distance);
+    extensions.appendChild(power);
+
+    trkpt.appendChild(extensions);
+
+    trkseg.appendChild(trkpt);
+  });
+
+  trk.appendChild(trkseg);
+  gpx.appendChild(trk);
+  doc.appendChild(gpx);
+
+  return doc;
+}
+
+
 
 //// wiring
 
@@ -188,8 +318,11 @@ document.getElementById("go").addEventListener('click', function(){
   log("Starting up by request!");
   initBt();
   initGps();
+  initOutput();
   log("Systems initialized");
 });
+
+document.getElementById("doc").addEventListener('click', showDoc);
 
 log("Page initialized");
 
