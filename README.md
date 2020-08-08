@@ -21,3 +21,8 @@ Running locally
 ruby -run -ehttpd . -p8000
 ```
 
+Live Demo
+---------
+
+https://aasmith.github.io/cyc
+
