@@ -4,7 +4,9 @@ pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
 </style>
 <h1>Hello</h1>
 
-<button id="go">Activate!</button>
+<button id="init">Activate!</button>
+<button id="start">Start / Continue Ride Log</button>
+<button id="stop">Stop Ride Log</button>
 <a href="data:" target="blank" id="gpx">Download GPX</a>
 
 <fieldset>
@@ -25,6 +27,8 @@ pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
 <pre id="log"></pre>
 
 <script>
+
+const TRACK_INTERVAL = 3000; // 3 second track logging interval
 
 //// bluetooth
 
@@ -148,7 +152,7 @@ function handleNotifications(event) {
 
   lastBt = values;
   lastBtTime = new Date();
-  showLatest();
+  //showLatest();
 
   updateRawDashboard(values);
 }
@@ -171,8 +175,6 @@ function littleEndianInt(data, offset, length, signed) {
 //// gps
 
 function handlePosition(pos) {
-  console.log(pos);
-
   // TODO: don't update pos if accuracy worse than 500m
   lastPos = pos;
   lastPosTime = new Date();
@@ -184,7 +186,7 @@ function handlePosition(pos) {
     acc: pos.coords.accuracy
   }
 
-  showLatest();
+  //showLatest();
   updateRawDashboard(values);
 }
 
@@ -219,6 +221,7 @@ function showLatest() {
 //// output
 
 var points = [];
+var timerRef;
 
 function popData() {
   if (lastPos && lastBt) {
@@ -226,8 +229,12 @@ function popData() {
   }
 }
 
-function initOutput() {
-  setInterval(popData ,5000);
+function startTrack() {
+  return setInterval(popData, TRACK_INTERVAL);
+}
+
+function stopTrack(ref) {
+  clearInterval(ref);
 }
 
 // compile the raw readout data into a structure that contains
@@ -367,12 +374,22 @@ function updateRawDashboard(values) {
   }
 }
 
-document.getElementById("go").addEventListener('click', function(){
+document.getElementById("init").addEventListener('click', function(){
   log("Starting up by request!");
   initBt();
   initGps();
-  initOutput();
   log("Systems initialized");
+});
+
+
+document.getElementById("start").addEventListener('click', function(){
+  timerRef = startTrack();
+  log(`Track logging every ${TRACK_INTERVAL / 1000} seconds`);
+});
+
+document.getElementById("stop").addEventListener('click', function(){
+  stopTrack(timerRef);
+  log("Track log stopped");
 });
 
 document.getElementById("gpx").addEventListener('click', downloadGpx);
@@ -387,6 +404,7 @@ TODO:
  vibrate on disconnect?
 
  update tracklog on gps update only?
+ vibrate at low batt?
 
  */
 </script>
