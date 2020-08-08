@@ -1,10 +1,26 @@
 <style>
 pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
+#log { height: 15em; overflow: scroll; }
 </style>
 <h1>Hello</h1>
 
 <button id="go">Activate!</button>
-<button id="doc">Show data</button>
+<a href="data:" target="blank" id="gpx">Download GPX</a>
+
+<fieldset>
+  <legend>Raw values</legend>
+  <label>lat <input readonly id="lat" /></label>
+  <label>lon <input readonly id="lon" /></label>
+  <label>ele <input readonly id="ele" /></label>
+  <label>acc <input readonly id="acc" /></label>
+  <hr/>
+  <label>ipower <input readonly id="ipower" /></label>
+  <label>wrev   <input readonly id="wrev" /></label>
+  <label>wtime  <input readonly id="wtime" /></label>
+  <label>crev   <input readonly id="crev" /></label>
+  <label>ctime  <input readonly id="ctime" /></label>
+  <label>joules <input readonly id="joules" /></label>
+</fieldset>
 
 <pre id="log"></pre>
 
@@ -15,8 +31,10 @@ pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
 var powerMeasurement;
 
 function log(str) {
-  document.getElementById("log").innerText += new Date().toLocaleString() + " > " + str + "\n";
-  window.scrollTo(0,document.body.scrollHeight);
+  const log = document.getElementById("log");
+
+  log.innerText += new Date().toLocaleString() + " > " + str + "\n";
+  log.scrollTo(0, log.scrollHeight);
 }
 
 function onDisconnected() {
@@ -131,6 +149,8 @@ function handleNotifications(event) {
   lastBt = values;
   lastBtTime = new Date();
   showLatest();
+
+  updateRawDashboard(values);
 }
 
 // extracts data with the correct endianness for bluetooth.
@@ -157,7 +177,15 @@ function handlePosition(pos) {
   lastPos = pos;
   lastPosTime = new Date();
 
+  const values = {
+    lat: pos.coords.latitude,
+    lon: pos.coords.longitude,
+    ele: pos.coords.altitude,
+    acc: pos.coords.accuracy
+  }
+
   showLatest();
+  updateRawDashboard(values);
 }
 
 function initGps() {
@@ -200,10 +228,6 @@ function popData() {
 
 function initOutput() {
   setInterval(popData ,5000);
-}
-
-function showDoc() {
-  log(new XMLSerializer().serializeToString(buildDoc(compileData(points))));
 }
 
 // compile the raw readout data into a structure that contains
@@ -310,9 +334,38 @@ function buildDoc(points) {
   return doc;
 }
 
+function downloadGpx() {
+  this.download = "x.gpx";
+  this.href = "data:application/xml;charset=utf-8," + encodeURIComponent(generateGpx());
+}
+
+function generateGpx() {
+  new XMLSerializer().serializeToString(buildDoc(compileData(points)));
+}
+
 
 
 //// wiring
+
+// raw dashboard
+var rdash = {
+     lat: document.getElementById("lat"),
+     lon: document.getElementById("lon"),
+     ele: document.getElementById("ele"),
+     acc: document.getElementById("acc"),
+  ipower: document.getElementById("ipower"),
+    wrev: document.getElementById("wrev"),
+   wtime: document.getElementById("wtime"),
+    crev: document.getElementById("crev"),
+   ctime: document.getElementById("ctime"),
+  joules: document.getElementById("joules")
+}
+
+function updateRawDashboard(values) {
+  for (const [key, value] of Object.entries(values)) {
+    rdash[key].value = value;
+  }
+}
 
 document.getElementById("go").addEventListener('click', function(){
   log("Starting up by request!");
@@ -322,7 +375,7 @@ document.getElementById("go").addEventListener('click', function(){
   log("Systems initialized");
 });
 
-document.getElementById("doc").addEventListener('click', showDoc);
+document.getElementById("gpx").addEventListener('click', downloadGpx);
 
 log("Page initialized");
 
@@ -332,6 +385,8 @@ TODO:
  add to local storage
  generate tcx or gpx (see strava docs)
  vibrate on disconnect?
+
+ update tracklog on gps update only?
 
  */
 </script>
