@@ -347,7 +347,7 @@ function downloadGpx() {
 }
 
 function generateGpx() {
-  new XMLSerializer().serializeToString(buildDoc(compileData(points)));
+  return new XMLSerializer().serializeToString(buildDoc(compileData(points)));
 }
 
 
