@@ -6,9 +6,31 @@
 pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
 #log { height: 15em; overflow: scroll; }
 </style>
-<h1>Hello</h1>
+<h1>Bluetooth Bicycle Logger</h1>
 
-<button id="init">Activate!</button>
+<p class=notice>
+The Geolocation API does not work when the page is backgrounded. This means
+the location data will be stale. The
+<a href="https://w3c.github.io/geolocation-sensor/">Geolocation Sensor API</a>
+is currently a draft spec, that once implemented <em>should</em> address
+this problem.
+
+<p>This app connect to your bicycle computer using Bluetooth.
+It logs power, distance, cadence, and speed from the bicycle,
+and GPS location from your phone. The collected data can be
+exported to a GPX file. 
+
+<p>
+You will need:
+<ul>
+  <li>A bicycle computer that emits the "Cycling Power" profile over Bluetooth.
+  <li>A device to load this site on. The browser needs Bluetooth API support,
+      and access to the Geolocation API.
+  <li>Somewhere to post your GPX file after you complete your ride. For exampe,
+      Strava, or some other service that can process GPX file uploads.
+</ul>
+
+<button id="init">Initialize sensors</button>
 <button id="start">Start / Continue Ride Log</button>
 <button id="stop">Stop Ride Log</button>
 <a href="" target="blank" id="gpx">Download GPX</a>
@@ -26,6 +48,14 @@ pre { border: 1px solid #aaa; background-color: #eee; padding: 10px; }
   <label>crev   <input readonly id="crev" /></label>
   <label>ctime  <input readonly id="ctime" /></label>
   <label>joules <input readonly id="joules" /></label>
+</fieldset>
+
+<fieldset>
+  <legend>Dashboard</legend>
+  <label> <input readonly id="power" /> watts</label>
+  <label> <input readonly id="dist" /> miles</label>
+  <label> <input readonly id="speed" /> MPH</label>
+  <label> <input readonly id="cadence" /> RPM</label>
 </fieldset>
 
 <pre id="log"></pre>
